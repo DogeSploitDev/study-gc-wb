@@ -1,43 +1,43 @@
-// widgetbot-proxy-fixed.js
+// server.js
 import express from "express";
-import fetch from "node-fetch";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
-const PORT = 3000;
-const WIDGETBOT_URL = "https://e.widgetbot.io/channels/1413202916675944531/1413202917673926748";
 
-// Utility to rewrite links in HTML
-function rewriteLinks(html, proxyBase) {
-  return html
-    .replace(/(src|href)=["'](https?:\/\/[^"']+)["']/g, `$1="${proxyBase}?url=$2"`)
-    .replace(/(url\(["']?)(https?:\/\/[^"')]+)(["']?\))/g, `$1${proxyBase}?url=$2$3`);
-}
-
-// Generic proxy
-app.get("/proxy", async (req, res) => {
-  const target = req.query.url;
-  if (!target) return res.status(400).send("Missing URL parameter");
-
-  try {
-    const response = await fetch(target, { headers: { "User-Agent": "Mozilla/5.0" } });
-    const contentType = response.headers.get("content-type") || "text/html";
-    let body = await response.text();
-
-    if (contentType.includes("text/html")) {
-      const proxyBase = `${req.protocol}://${req.get("host")}/proxy`;
-      body = rewriteLinks(body, proxyBase);
-    }
-
-    res.set("Content-Type", contentType).send(body);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching URL");
-  }
+// Serve HTML directly
+app.get("/", (req, res) => {
+  res.send(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>WidgetBot via Proxy</title>
+        <style>
+          html, body { margin:0; height:100%; }
+          iframe { width:100%; height:100%; border:0; }
+        </style>
+      </head>
+      <body>
+        <!-- Embed WidgetBot directly via iframe -->
+        <iframe
+          src="https://e.widgetbot.io/channels/1413202916675944531/1413202917673926748"
+          allow="clipboard-write; fullscreen"
+          title="Discord Chat">
+        </iframe>
+      </body>
+    </html>
+  `);
 });
 
-// Shortcut route for WidgetBot
-app.get("/widgetbot", async (req, res) => {
-  res.redirect(`/proxy?url=${encodeURIComponent(WIDGETBOT_URL)}`);
-});
+// Optional: proxy Crate JS library if needed
+app.use(
+  "/jsdelivr",
+  createProxyMiddleware({
+    target: "https://cdn.jsdelivr.net",
+    changeOrigin: true,
+    pathRewrite: { "^/jsdelivr": "" },
+  })
+);
 
-app.listen(PORT, () => console.log(`WidgetBot proxy running at http://localhost:${PORT}/proxy?url=`));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
