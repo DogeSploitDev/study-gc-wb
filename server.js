@@ -1,6 +1,7 @@
 // server.js
 import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
+import http from "http";
 
 const app = express();
 
@@ -18,7 +19,6 @@ app.get("/", (req, res) => {
         </style>
       </head>
       <body>
-        <!-- Load WidgetBot through proxy instead of direct -->
         <iframe
           src="/widgetbot/channels/1413202916675944531/1413202917673926748"
           allow="clipboard-write; fullscreen"
@@ -29,17 +29,16 @@ app.get("/", (req, res) => {
   `);
 });
 
-// Proxy for WidgetBot
-app.use(
-  "/widgetbot",
-  createProxyMiddleware({
-    target: "https://e.widgetbot.io",
-    changeOrigin: true,
-    pathRewrite: { "^/widgetbot": "" },
-  })
-);
+// Proxy for WidgetBot (HTTP + WebSocket)
+const widgetbotProxy = createProxyMiddleware({
+  target: "https://e.widgetbot.io",
+  changeOrigin: true,
+  ws: true, // WebSockets enabled
+  pathRewrite: { "^/widgetbot": "" },
+});
+app.use("/widgetbot", widgetbotProxy);
 
-// Optional: proxy JS libraries if needed
+// Optional: proxy CDN
 app.use(
   "/jsdelivr",
   createProxyMiddleware({
@@ -50,6 +49,11 @@ app.use(
 );
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`Server running at http://localhost:${PORT}`)
-);
+const server = http.createServer(app);
+
+// Make sure WebSockets are handled
+server.on("upgrade", widgetbotProxy.upgrade);
+
+server.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
