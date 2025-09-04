@@ -4,7 +4,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
 
-// Serve HTML directly
+// Serve HTML with iframe pointing to proxy
 app.get("/", (req, res) => {
   res.send(`
     <!doctype html>
@@ -18,9 +18,9 @@ app.get("/", (req, res) => {
         </style>
       </head>
       <body>
-        <!-- Embed WidgetBot directly via iframe -->
+        <!-- Load WidgetBot through proxy instead of direct -->
         <iframe
-          src="https://e.widgetbot.io/channels/1413202916675944531/1413202917673926748"
+          src="/widgetbot/channels/1413202916675944531/1413202917673926748"
           allow="clipboard-write; fullscreen"
           title="Discord Chat">
         </iframe>
@@ -29,7 +29,17 @@ app.get("/", (req, res) => {
   `);
 });
 
-// Optional: proxy Crate JS library if needed
+// Proxy for WidgetBot
+app.use(
+  "/widgetbot",
+  createProxyMiddleware({
+    target: "https://e.widgetbot.io",
+    changeOrigin: true,
+    pathRewrite: { "^/widgetbot": "" },
+  })
+);
+
+// Optional: proxy JS libraries if needed
 app.use(
   "/jsdelivr",
   createProxyMiddleware({
@@ -40,4 +50,6 @@ app.use(
 );
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+app.listen(PORT, () =>
+  console.log(`Server running at http://localhost:${PORT}`)
+);
