@@ -1,61 +1,43 @@
+// widgetbot-proxy-fixed.js
 import express from "express";
-import { createProxyMiddleware } from "http-proxy-middleware";
+import fetch from "node-fetch";
 
 const app = express();
+const PORT = 3000;
+const WIDGETBOT_URL = "https://e.widgetbot.io/channels/1413202916675944531/1413202917673926748";
 
-// Serve HTML directly
-app.get("/", (req, res) => {
-  res.send(`
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <title>WidgetBot Crate via Proxy</title>
-      </head>
-      <body>
-        <h1>WidgetBot Proxy Test</h1>
+// Utility to rewrite links in HTML
+function rewriteLinks(html, proxyBase) {
+  return html
+    .replace(/(src|href)=["'](https?:\/\/[^"']+)["']/g, `$1="${proxyBase}?url=$2"`)
+    .replace(/(url\(["']?)(https?:\/\/[^"')]+)(["']?\))/g, `$1${proxyBase}?url=$2$3`);
+}
 
-        <!-- Load Crate library -->
-        <script src="/jsdelivr/npm/@widgetbot/crate@3"></script>
+// Generic proxy
+app.get("/proxy", async (req, res) => {
+  const target = req.query.url;
+  if (!target) return res.status(400).send("Missing URL parameter");
 
-        <!-- Initialize Crate after library loads -->
-        <script>
-          window.addEventListener('load', function() {
-            if (typeof Crate !== 'undefined') {
-              new Crate({
-                server: '1413202916675944531', // your server ID
-                channel: '1413202917673926748', // your channel ID
-                shard: '/widgetbot'
-              });
-            } else {
-              console.error('Crate did not load');
-            }
-          });
-        </script>
-      </body>
-    </html>
-  `);
+  try {
+    const response = await fetch(target, { headers: { "User-Agent": "Mozilla/5.0" } });
+    const contentType = response.headers.get("content-type") || "text/html";
+    let body = await response.text();
+
+    if (contentType.includes("text/html")) {
+      const proxyBase = `${req.protocol}://${req.get("host")}/proxy`;
+      body = rewriteLinks(body, proxyBase);
+    }
+
+    res.set("Content-Type", contentType).send(body);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching URL");
+  }
 });
 
-// Proxy Crate library
-app.use(
-  "/jsdelivr",
-  createProxyMiddleware({
-    target: "https://cdn.jsdelivr.net",
-    changeOrigin: true,
-    pathRewrite: { "^/jsdelivr": "" },
-  })
-);
+// Shortcut route for WidgetBot
+app.get("/widgetbot", async (req, res) => {
+  res.redirect(`/proxy?url=${encodeURIComponent(WIDGETBOT_URL)}`);
+});
 
-// Proxy WidgetBot shard
-app.use(
-  "/widgetbot",
-  createProxyMiddleware({
-    target: "https://e.widgetbot.io",
-    changeOrigin: true,
-    pathRewrite: { "^/widgetbot": "" },
-  })
-);
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`WidgetBot proxy running at http://localhost:${PORT}/proxy?url=`));
