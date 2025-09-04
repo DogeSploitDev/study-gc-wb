@@ -1,18 +1,32 @@
-// server.js
 import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// Serve static files (your site)
-app.use(express.static(path.join(__dirname, "public")));
+// Serve your OG HTML directly
+app.get("/", (req, res) => {
+  res.send(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>WidgetBot Crate via Proxy</title>
+      </head>
+      <body>
+        <script src="/jsdelivr/npm/@widgetbot/crate@3" async defer></script>
+        <script>
+          new Crate({
+            server: '1413202916675944531', // your server ID
+            channel: '1413202917673926748', // your channel ID
+            shard: '/widgetbot' // use backend proxy
+          })
+        </script>
+      </body>
+    </html>
+  `);
+});
 
-// Proxy WidgetBot JS (cdn.jsdelivr.net) through your server
+// Proxy Crate library
 app.use(
   "/jsdelivr",
   createProxyMiddleware({
@@ -22,7 +36,7 @@ app.use(
   })
 );
 
-// Proxy WidgetBot shard (chat iframe API)
+// Proxy WidgetBot shard
 app.use(
   "/widgetbot",
   createProxyMiddleware({
@@ -33,6 +47,4 @@ app.use(
 );
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running at http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
