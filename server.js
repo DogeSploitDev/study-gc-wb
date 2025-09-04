@@ -3,7 +3,7 @@ import { createProxyMiddleware } from "http-proxy-middleware";
 
 const app = express();
 
-// Serve your OG HTML directly
+// Serve HTML directly
 app.get("/", (req, res) => {
   res.send(`
     <!doctype html>
@@ -13,13 +13,24 @@ app.get("/", (req, res) => {
         <title>WidgetBot Crate via Proxy</title>
       </head>
       <body>
-        <script src="/jsdelivr/npm/@widgetbot/crate@3" async defer></script>
+        <h1>WidgetBot Proxy Test</h1>
+
+        <!-- Load Crate library -->
+        <script src="/jsdelivr/npm/@widgetbot/crate@3"></script>
+
+        <!-- Initialize Crate after library loads -->
         <script>
-          new Crate({
-            server: '1413202916675944531', // your server ID
-            channel: '1413202917673926748', // your channel ID
-            shard: '/widgetbot' // use backend proxy
-          })
+          window.addEventListener('load', function() {
+            if (typeof Crate !== 'undefined') {
+              new Crate({
+                server: '1413202916675944531', // your server ID
+                channel: '1413202917673926748', // your channel ID
+                shard: '/widgetbot'
+              });
+            } else {
+              console.error('Crate did not load');
+            }
+          });
         </script>
       </body>
     </html>
